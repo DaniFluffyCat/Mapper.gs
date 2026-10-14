@@ -1082,9 +1082,10 @@ class Mapper {
 
     // Se solicitado buscar uma key
     else {
-      key = String(key).trim()                  // Limpa keys
-      if (this._keys.has(key)) return false     // Se key carregada, encerra
-      foundKeys = this._getRowIndexesByKey(key) // Busca key solicitada
+      key = String(key).trim()                                            // Limpa keys
+      if (key === undefined || key === null || key === "") return false;  // Se key vazia, aborta
+      if (this._keys.has(key)) return false                               // Se key carregada, encerra
+      foundKeys = this._getRowIndexesByKey(key)                           // Busca key solicitada
     }
 
     // Adiciona keys à memória
@@ -1685,8 +1686,11 @@ class Mapper {
     if (this._commited) throw this._log(250)
 
     try {
+      // Validação de segurança para evitar buscar a string "null" ou "undefined"
+      if (key === undefined || key === null || String(key).trim() === "") return false;
+
       key = String(key).trim()                            // Ajusta key para texto
-      this._loadKey(true)                                 // Carrega todas as keys
+      this._loadKey(key)                                  // Carrega a key solicitada
       let keyStatus = this._keys.get(key)                 // Obtém estado
       if (keyStatus === undefined) return false           // Se não existe, false
       if (keyStatus === "deleted") return false           // Se deletado, false
@@ -1714,7 +1718,10 @@ class Mapper {
     if (this._commited) throw this._log(250)
 
     // Define vars
-    let keyStatus, keyLoaded, requestedData
+    let keyStatus, requestedData
+
+    // Validação de segurança para evitar buscar "null" ou "undefined"
+    if (key === undefined || key === null || String(key).trim() === "") return undefined;
 
     // Obtém dados da key solicitada
     key = String(key).trim()                        // Formata a key
@@ -1770,7 +1777,7 @@ class Mapper {
 
   /**
    * Returns a iterator that contains all active entries in the store. Only available on mode = full
-   * * @yields {string} The next active entries.
+   * @yields {[string, Object]} The next active entry (key-value pair).
    * @returns {IterableIterator<[string, Object]>} An iterable iterator of non-deleted entries.
    * @throws {Error} If Mapper is not in mode = full.
    * 
@@ -1854,7 +1861,7 @@ class Mapper {
         // OBJETO LITERAL (testar)
         if (Object.prototype.toString.call(value) === '[object Object]') {
 
-          for (let v of Object.entries(value)) {              // Para cada valor
+          for (let v of Object.values(value)) {             // Para cada valor
             if (match(v, condition, mode)) return true;     // Se valor true, encerrar com true
           }
           return false;                                       // Se nada for true, encerrar com false
@@ -2068,6 +2075,7 @@ class Mapper {
     // Fase 0 de validação: keys
     if (typeof key !== 'string' && typeof key !== 'number') { throw Error(`key must be a string or number`) }
     key = String(key).trim()
+    this._loadKey(key)
 
     // Fase 1 de validação: é um objeto válido?
     let validValue = this._typeJStoGS(value, 'clone')
@@ -2434,16 +2442,31 @@ class Mapper {
 
       // Caso se queira limpar toda a planilha,
       // adiciona um request de exclusão total
-      if (this._wipeOnCommit) requestDelete.unshift({
-        deleteDimension: {
-          range: {
+      if (this._wipeOnCommit) {
+
+        // Adiciona 10 linhas em branco no commit
+        // para garantir que a tabela não fique vazia
+        requestDelete.push({
+          appendDimension: {
             sheetId: this._tableID,
             dimension: "ROWS",
-            startIndex: 1,
-            endIndex: lastRow
+            length: 10
           }
-        }
-      })
+        });
+
+        // Apaga as linhas anteriores existentes
+        if (lastRow > 1) requestDelete.push({
+            deleteDimension: {
+              range: {
+                sheetId: this._tableID,
+                dimension: "ROWS",
+                startIndex: 1,
+                endIndex: lastRow
+              }
+            }
+          })
+        
+      }
 
       // Caso não tenha Wipe, adiciona requests normais de update e exclusão
       if (!this._wipeOnCommit) {

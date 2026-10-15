@@ -416,6 +416,46 @@ class Mapper {
   }
 
   /**
+   * Força a quebra do cadeado de leitura/escrita de uma tabela,
+   * limpando os metadados de bloqueio.
+   * Essa função quebra as regras de concorrência, então use
+   * APENAS PARA FINS DE DEBUG.
+   * 
+   * @param {string} sheetId O identificador único do Google Planilhas (extraível pela URL).
+   * @param {string} tableName O exato nome da aba a ser gerida.
+   */
+  static breakLocker(sheetId, tableName) {
+
+      let ss, sheet
+      ss = SpreadsheetApp.openById(sheetId)                         // Carrega planilha
+      sheet = ss.getSheetByName(tableName)                          // Carrega página
+      if (sheet === null) throw Error(`"${tableName}" not found.`)  // Lança erro se não houver página
+
+
+      // Chaves usadas no _locker
+      const keysToReset = [
+        "Mapper_lockerAge",
+        "Mapper_readersCount",
+        "Mapper_isWriting"
+      ]
+
+      // Limpa qualquer metadado existente com essas chaves
+      keysToReset.forEach(key => {
+        const finder = sheet.createDeveloperMetadataFinder().withKey(key).find()
+        finder.forEach(metadata => metadata.remove())
+      })
+
+      // Define os valores padrão de "cadeado aberto"
+      const visibility = SpreadsheetApp.DeveloperMetadataVisibility.PROJECT
+      sheet.addDeveloperMetadata("Mapper_readersCount", "0", visibility)
+      sheet.addDeveloperMetadata("Mapper_isWriting", "false", visibility)
+
+      // Retorna true para confirmar que o cadeado foi quebrado com sucesso
+      return true
+
+  }
+
+  /**
    * Emite log, avisos e erros da biblioteca.
    * @param {number} code - O código identificador da ocorrência.
    * @param {*} [info] - Contexto dinâmico para a mensagem. 
@@ -2448,7 +2488,7 @@ class Mapper {
 
       // Caso se queira limpar toda a planilha,
       // adiciona um request de exclusão total
-      if (this._wipeOnCommit) requestDelete.unshift({
+      if (this._wipeOnCommit && lastRow > 1) requestDelete.unshift({
         deleteDimension: {
           range: {
             sheetId: this._tableID,

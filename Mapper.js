@@ -2436,37 +2436,23 @@ class Mapper {
       let lastRow = this._table.getLastRow()
 
       // Prepara para obter requests
+      let requestUnfreeze = []
       let requestDelete = []
       let requestAdd = []
       let requestUpdate = []
 
       // Caso se queira limpar toda a planilha,
       // adiciona um request de exclusão total
-      if (this._wipeOnCommit) {
-
-        // Adiciona 10 linhas em branco no commit
-        // para garantir que a tabela não fique vazia
-        requestDelete.push({
-          appendDimension: {
+      if (this._wipeOnCommit) requestDelete.unshift({
+        deleteDimension: {
+          range: {
             sheetId: this._tableID,
             dimension: "ROWS",
-            length: 10
+            startIndex: 1,
+            endIndex: lastRow
           }
-        });
-
-        // Apaga as linhas anteriores existentes
-        if (lastRow > 1) requestDelete.push({
-            deleteDimension: {
-              range: {
-                sheetId: this._tableID,
-                dimension: "ROWS",
-                startIndex: 1,
-                endIndex: lastRow
-              }
-            }
-          })
-        
-      }
+        }
+      })
 
       // Caso não tenha Wipe, adiciona requests normais de update e exclusão
       if (!this._wipeOnCommit) {
@@ -2478,8 +2464,24 @@ class Mapper {
       // Adiciona requests de novas linhas em ambos os casos
       requestAdd = api_prepareAddRequests(columnIndexes)
 
+      // Adiciona uma requisição de remoção de colunas e linhas congeladas
+      // caso haja qualquer operação de exclusão
+      if (requestDelete.length != 0) requestUnfreeze = [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: this._tableID,
+            gridProperties: {
+              frozenRowCount: 0,
+              frozenColumnCount: 0
+            }
+          },
+          fields: "gridProperties(frozenRowCount,frozenColumnCount)"
+        }
+      }];
+
+
       // Junta todas as requests na ordem que precisam ser chamadas
-      let fullRequests = [...requestUpdate, ...requestDelete, ...requestAdd]
+      let fullRequests = [...requestUnfreeze, ...requestUpdate, ...requestDelete, ...requestAdd]
 
       // Se há requisições
       if (fullRequests.length !== 0) {
@@ -2517,5 +2519,3 @@ class Mapper {
  * @deprecated Use `Mapper` em vez de `Codex`. Mantido para fins de retrocompatibilidade.
  */
 const Codex = Mapper;
-
-

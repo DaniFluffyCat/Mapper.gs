@@ -8,13 +8,13 @@ class Mapper {
    * Creates a new Mapper instance to manage a Google Sheets tab as a persistent key-value store.
    * This class adapts the Google Sheets API to function similarly to a JavaScript `Map`,
    *
-   * @param {string} sheetId - The unique identifier of the Google Spreadsheet (extractable from the URL).
-   * @param {string} tableName - The exact name of the tab (Sheet) to be managed.
-   * @param {string} keyColumnName - The header name of the column that serves as the unique Primary Key (ID).
-   * @param {Object} options - Configuration options for initialization.
-   * @param {("full"|"minimal")} options.mode - Defines whether the spreadsheet should be pre-loaded into memory or requested on demand.
-   * @param {string[]} [options.columns] - Array of specific column names to be eager-loaded during instantiation.
-   * @param {boolean} [options.enableTypeInference] - Allow Mapper to infer rich types, like Arrays and Objects, from data.
+   * @param {Object} options Configuration options for initialization.
+   * @param {string} options.sheetId The unique identifier of the Google Spreadsheet (extractable from the URL).
+   * @param {string} options.tableName The exact name of the tab (Sheet) to be managed.
+   * @param {string} options.keyColumnName The header name of the column that serves as the unique Primary Key (ID).
+   * @param {("full"|"minimal")} [options.mode="minimal"] Defines whether the spreadsheet should be pre-loaded into memory or requested on demand.
+   * @param {string[]} [options.columns] Array of specific column names to be eager-loaded during instantiation.
+   * @param {boolean} [options.enableTypeInference=true] Allow Mapper to infer rich types, like Arrays and Objects, from data.
    *
    * @throws {Error} If the "Google Sheets API" Advanced Service is not enabled with the identifier "Sheets".
    * @throws {Error} If the spreadsheet or the specified tab cannot be accessed.
@@ -23,24 +23,32 @@ class Mapper {
    * // Initialize connection to "Users" tab using "UserID" as key
    * 
    * // Not specifying "columns" will request all columns.
-   * const dbAllColumns = new Mapper("1BxiM...", "Users", "UserID", {
+   * const dbAllColumns = new Mapper({
+   *     sheetId: "1BxiM...", 
+   *     tableName: "Users", 
+   *     keyColumnName: "UserID",
    *     mode: "minimal"
    * });
    * 
    * // mode: "minimal" retrieves line data on demand.
-   * const dbOnDemand = new Mapper("1BxiM...", "Users", "UserID", {
+   * const dbOnDemand = new Mapper({
+   *     sheetId: "1BxiM...", 
+   *     tableName: "Users", 
+   *     keyColumnName: "UserID",
    *     mode: "minimal",
    *     columns: ["Price", "Stock"]
    * });
    * 
    * // mode: "full" retrieves all data from the rows at initialization.
-   * const dbAllData = new Mapper("1BxiM...", "Users", "UserID", {
+   * const dbAllData = new Mapper({
+   *     sheetId: "1BxiM...", 
+   *     tableName: "Users", 
+   *     keyColumnName: "UserID",
    *     mode: "full",
    *     columns: ["Stock", "Description"]
    * });
    */
-  constructor(sheetId, tableName, keyColumnName, options = {}) {
-
+  constructor(options = {}) {
 
 
     // FASE 0 - VALIDAÇÃO DE DEPENDÊNCIAS E DEFINIÇÃO DE VARS GLOBAIS
@@ -50,7 +58,7 @@ class Mapper {
      * @type {string}
      * @private
      */
-    this._logSign = `[ Mapper | SheetID:"${sheetId}" | Table: "${tableName}" ]\n`;
+    this._logSign = `[ Mapper | SheetID:"${options.sheetId}" | Table: "${options.tableName}" ]\n`;
 
 
 
@@ -67,9 +75,8 @@ class Mapper {
      * @type {string}
      * @private
      */
-    this._sheetID = sheetId;
-    if (typeof sheetId !== 'string') throw this._log(244, this._sheetID)
-
+    this._sheetID = options.sheetId;
+    if (typeof this._sheetID !== 'string') throw this._log(244, this._sheetID)
 
 
     /**
@@ -88,9 +95,8 @@ class Mapper {
      * @type {string}
      * @private
      */
-    this._tableName = tableName;
-    if (typeof tableName !== 'string') throw this._log(244, this._tableName)
-
+    this._tableName = options.tableName;
+    if (typeof this._tableName !== 'string') throw this._log(244, this._tableName)
 
 
     /**
@@ -119,9 +125,8 @@ class Mapper {
      * @type {string}
      * @private
      */
-    this._keyColumnName = keyColumnName;
-    if (typeof keyColumnName !== 'string') throw this._log(244, this._tableName)
-
+    this._keyColumnName = options.keyColumnName;
+    if (typeof this._keyColumnName !== 'string') throw this._log(244, this._keyColumnName)
 
 
     /**
@@ -2514,8 +2519,3 @@ class Mapper {
   }
 
 }
-
-/**
- * @deprecated Use `Mapper` em vez de `Codex`. Mantido para fins de retrocompatibilidade.
- */
-const Codex = Mapper;

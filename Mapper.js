@@ -1,4 +1,4 @@
-// Mapper.GS v0.4- https://codex.danifluffy.dev
+// Mapper.GS v0.5- https://codex.danifluffy.dev
 // Library to manage spreadsheets with an ORM correlated to JS Maps.
 // Created by danifluffy.dev
 
@@ -426,32 +426,32 @@ class Mapper {
    */
   static breakLocker(sheetId, tableName) {
 
-      let ss, sheet
-      ss = SpreadsheetApp.openById(sheetId)                         // Carrega planilha
-      sheet = ss.getSheetByName(tableName)                          // Carrega página
-      if (sheet === null) throw Error(`"${tableName}" not found.`)  // Lança erro se não houver página
+    let ss, sheet
+    ss = SpreadsheetApp.openById(sheetId)                         // Carrega planilha
+    sheet = ss.getSheetByName(tableName)                          // Carrega página
+    if (sheet === null) throw Error(`"${tableName}" not found.`)  // Lança erro se não houver página
 
 
-      // Chaves usadas no _locker
-      const keysToReset = [
-        "Mapper_lockerAge",
-        "Mapper_readersCount",
-        "Mapper_isWriting"
-      ]
+    // Chaves usadas no _locker
+    const keysToReset = [
+      "Mapper_lockerAge",
+      "Mapper_readersCount",
+      "Mapper_isWriting"
+    ]
 
-      // Limpa qualquer metadado existente com essas chaves
-      keysToReset.forEach(key => {
-        const finder = sheet.createDeveloperMetadataFinder().withKey(key).find()
-        finder.forEach(metadata => metadata.remove())
-      })
+    // Limpa qualquer metadado existente com essas chaves
+    keysToReset.forEach(key => {
+      const finder = sheet.createDeveloperMetadataFinder().withKey(key).find()
+      finder.forEach(metadata => metadata.remove())
+    })
 
-      // Define os valores padrão de "cadeado aberto"
-      const visibility = SpreadsheetApp.DeveloperMetadataVisibility.PROJECT
-      sheet.addDeveloperMetadata("Mapper_readersCount", "0", visibility)
-      sheet.addDeveloperMetadata("Mapper_isWriting", "false", visibility)
+    // Define os valores padrão de "cadeado aberto"
+    const visibility = SpreadsheetApp.DeveloperMetadataVisibility.PROJECT
+    sheet.addDeveloperMetadata("Mapper_readersCount", "0", visibility)
+    sheet.addDeveloperMetadata("Mapper_isWriting", "false", visibility)
 
-      // Retorna true para confirmar que o cadeado foi quebrado com sucesso
-      return true
+    // Retorna true para confirmar que o cadeado foi quebrado com sucesso
+    return true
 
   }
 
@@ -629,9 +629,10 @@ class Mapper {
 
       // Modo rápido
       if (mode == "SINGLE") {
+        if (lastRow < 2) return rowIndexes;                                     // Se não tem linhas, encerra
         let index = this._table.getRange(2, keys_colIdx + 1, lastRow - 1)       // Obtém range de keys
-          .createTextFinder(requestedKeys).matchEntireCell(true)              // Pesquisa na planilha
-          .findPrevious()                                                     // Obtém índice da última instância
+          .createTextFinder(requestedKeys).matchEntireCell(true)                // Pesquisa na planilha
+          .findPrevious()                                                       // Obtém índice da última instância
         if (index !== null) rowIndexes.set(requestedKeys, index.getRow() - 1)   // Adiciona indice no Map
         return rowIndexes                                                       // Encerra execução
       }
@@ -901,6 +902,9 @@ class Mapper {
 
     }
 
+    // Caso não haja dados a buscar, abortar.
+    if (requestedData.size === 0) return;
+
     // Executa a requisição
     let APIresponse;
     try {
@@ -918,7 +922,7 @@ class Mapper {
     } catch (e) {
 
       // Checa se é um erro de request grande demais
-      if (e.message.includes("Response Code: 413. Message: response too large.")) mode = `${mode}-SAFETY`
+      if (e.message.includes("response too large")) mode = `${mode}-SAFETY`
       else throw this._log(310, e)    // Se não for, lança erro
     }
 
@@ -1676,6 +1680,7 @@ class Mapper {
 
     try {
       this._wipeOnCommit = true;  // Marca planilha para exclusão
+      this._loadedAllKeys = true; // Marca como se todas as keys estivessem carregadas
       this._keys.clear();         // Limpa histórico de mudanças
       this._data.clear();         // Limpa memória da instancia
     }
@@ -2307,8 +2312,8 @@ class Mapper {
       let requestAdd = []
       let activeRequest = []
 
-      // Limita o payload criado a 900kB
-      let limitPayloadSize = 900000
+      // Limita o payload criado a 100kB
+      let limitPayloadSize = 100000
       let actualPayloadSize = 0
 
       // Itera sobre os valores
@@ -2395,11 +2400,8 @@ class Mapper {
         values: [{ values: data.values }]
       }))
 
-      // Mescla linhas
-      let mergedRows = this._mergeRequests('rows', rowReadyForAPI)
-
       // Retorna valor construído para API
-      return mergedRows.map(item => ({
+      return rowReadyForAPI.map(item => ({
         updateCells: {
           range: {
             sheetId: this._tableID,
@@ -2426,7 +2428,7 @@ class Mapper {
       let allPayloads = []                // Buffer de todos os payloads
       let prevPayload = []                // Buffer de apenas o payload atual
       let lengthPrevPayload = 0           // Avalia o tamanho do payload
-      let limitLengthPayload = 5000000    // Limita o payload a 5MB
+      let limitLengthPayload = 1000000    // Limita o payload a 1MB
 
       for (let curr of receivedPayloads) {
 
@@ -2435,7 +2437,7 @@ class Mapper {
         let potentialLength = lengthPrevPayload + json.length
 
         // Se tamanho vai exceder
-        if (potentialLength > limitLengthPayload) {
+        if (potentialLength > limitLengthPayload && prevPayload.length > 0) {
           allPayloads.push(prevPayload)   // Armazena anterior ao buffer de retorno
           prevPayload = []                // Reseta buffer
           lengthPrevPayload = 0           // Zera counter de tamanho
@@ -2537,7 +2539,9 @@ class Mapper {
         // Executa os requests à API
         for (let [index, payload] of splittedPayloads.entries()) {
 
-          try { Sheets.Spreadsheets.batchUpdate({ requests: payload }, this._sheetID) }
+          try {
+            Sheets.Spreadsheets.batchUpdate({ requests: payload }, this._sheetID)
+          }
           catch (e) { throw this._log(310, e) }
 
         }

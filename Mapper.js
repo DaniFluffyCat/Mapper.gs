@@ -1,4 +1,4 @@
-// Mapper.GS v0.5- https://codex.danifluffy.dev
+// Mapper.GS v0.6- https://codex.danifluffy.dev
 // Library to manage spreadsheets with an ORM correlated to JS Maps.
 // Created by danifluffy.dev
 
@@ -1774,13 +1774,13 @@ class Mapper {
     if (key === undefined || key === null || String(key).trim() === "") return undefined;
 
     // Obtém dados da key solicitada
-    key = String(key).trim()                        // Formata a key
-    this._fetchNewData([key])                       // Carrega valor na memória
-    keyStatus = this._keys.get(key)                 // Obtém estado da key
-    if (keyStatus === undefined) return undefined   // Se não existe, encerra
-    if (keyStatus === "deleted") return undefined   // Se deletada, encerra
-    requestedData = this._data.get(key)             // Carrega o dado em uma var local
-    if (!requestedData) return undefined            // Se não achar, retorna undefined
+    key = String(key).trim()                                        // Formata a key
+    if (this._options.mode !== "full") this._fetchNewData([key])    // Carrega valor na memória
+    keyStatus = this._keys.get(key)                                 // Obtém estado da key
+    if (keyStatus === undefined) return undefined                   // Se não existe, encerra
+    if (keyStatus === "deleted") return undefined                   // Se deletada, encerra
+    requestedData = this._data.get(key)                             // Carrega o dado em uma var local
+    if (!requestedData) return undefined                            // Se não achar, retorna undefined
 
     // Cria proxy do objeto e retorna.
     return this._createProxy(requestedData, key)
@@ -2428,7 +2428,7 @@ class Mapper {
       let allPayloads = []                // Buffer de todos os payloads
       let prevPayload = []                // Buffer de apenas o payload atual
       let lengthPrevPayload = 0           // Avalia o tamanho do payload
-      let limitLengthPayload = 1000000    // Limita o payload a 1MB
+      let limitLengthPayload = 5000000    // Limita o payload a 5MB
 
       for (let curr of receivedPayloads) {
 
@@ -2541,6 +2541,7 @@ class Mapper {
 
           try {
             Sheets.Spreadsheets.batchUpdate({ requests: payload }, this._sheetID)
+            Utilities.sleep(1000)
           }
           catch (e) { throw this._log(310, e) }
 
